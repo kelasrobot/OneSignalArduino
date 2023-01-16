@@ -1,15 +1,18 @@
 #include "OneSignalArduino.h"
 #include "Arduino.h"
 
-void OneSignalArduino::begin(String _inputOneSignalAuth, String _inputOneSignalAppId) {
+void OneSignalArduino::begin(String _inputOneSignalAuth,
+                             String _inputOneSignalAppId) {
   configTime(0, 0, "pool.ntp.org", "time.nist.gov");
   Serial.print(F("Waiting for NTP time sync: "));
   time_t nowSecs = time(nullptr);
-  while (nowSecs < 8 * 3600 * 2) {
-    delay(500);
-    Serial.print(F("."));
-    yield();
-    nowSecs = time(nullptr);
+  if (WiFi.status() == WL_CONNECTED) {
+    while (nowSecs < 1 * 3600 * 2) {
+      delay(500);
+      Serial.print(F("."));
+      yield();
+      nowSecs = time(nullptr);
+    }
   }
   Serial.println();
   struct tm timeinfo;
@@ -21,28 +24,40 @@ void OneSignalArduino::begin(String _inputOneSignalAuth, String _inputOneSignalA
   _oneSignalAppId = _inputOneSignalAppId;
 }
 
-void OneSignalArduino::send(String _inputOneSignalHeadings, String _inputOneSignalContents) {
+void OneSignalArduino::send(String _inputOneSignalHeadings,
+                            String _inputOneSignalContents) {
   WiFiClientSecure *client = new WiFiClientSecure;
-  client -> setInsecure();//skip verification
+  client->setInsecure(); // skip verification
   //  if(client) {
   //    client -> se(fingerprint);
   //
   //    {
-  // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
+  // Add a scoping block for HTTPClient https to make sure it is destroyed
+  // before WiFiClientSecure *client is
   HTTPClient https;
   Serial.print("Sending Notification...\n");
-  if (https.begin(*client, "https://onesignal.com/api/v1/notifications")) {  // HTTPS
-    https.addHeader("Content-Type", "application/json; charset=utf-8", true, false);
-    https.addHeader("Authorization", "Basic " + _oneSignalAuth); // remove '<>' wheb typing api key
+  if (https.begin(*client,
+                  "https://onesignal.com/api/v1/notifications")) { // HTTPS
+    https.addHeader("Content-Type", "application/json; charset=utf-8", true,
+                    false);
+    https.addHeader("Authorization",
+                    "Basic " +
+                        _oneSignalAuth); // remove '<>' wheb typing api key
 
     Serial.print("Sending Notification... POST...\n");
 
     String json = "{"
-                  "\"app_id\": \"" + _oneSignalAppId + "\","
+                  "\"app_id\": \"" +
+                  _oneSignalAppId +
+                  "\","
                   "\"included_segments\": [\"Subscribed Users\"],"
                   "\"data\": {\"foo\": \"bar\"},"
-                  "\"headings\": {\"en\": \"" + _inputOneSignalHeadings + "\"},"
-                  "\"contents\": {\"en\": \"" + _inputOneSignalHeadings + "\"}"
+                  "\"headings\": {\"en\": \"" +
+                  _inputOneSignalHeadings +
+                  "\"},"
+                  "\"contents\": {\"en\": \"" +
+                  _inputOneSignalContents +
+                  "\"}"
                   "}";
 
     int httpCode = https.POST(json);
@@ -54,7 +69,8 @@ void OneSignalArduino::send(String _inputOneSignalHeadings, String _inputOneSign
         Serial.println(payload);
       }
     } else {
-      Serial.printf("Send Notification... failed, error: %s\n", https.errorToString(httpCode).c_str());
+      Serial.printf("Send Notification... failed, error: %s\n",
+                    https.errorToString(httpCode).c_str());
     }
     https.end();
   } else {
